@@ -313,11 +313,12 @@ def coveragePipelines(ctx):
 	# All pipelines that might have coverage or other test analysis reported
 	jsPipelines = javascript(ctx)
 	phpUnitPipelines = phpTests(ctx, 'phpunit')
+	phpUnitFilesExternalPipeline = filesExternalPhpUnitTests()
 	phpIntegrationPipelines = phpTests(ctx, 'phpintegration')
 	if (jsPipelines == False) or (phpUnitPipelines == False) or (phpIntegrationPipelines == False):
 		return False
 
-	return jsPipelines + phpUnitPipelines + phpIntegrationPipelines
+	return jsPipelines + phpUnitPipelines + phpIntegrationPipelines + phpUnitFilesExternalPipeline
 
 def stagePipelines(ctx):
 	# Pipelines that do not produce coverage or other test analysis reports
@@ -2392,6 +2393,82 @@ def owncloudLog(server, folder):
 			'tail -f /drone/%s/data/owncloud.log' % folder
 		]
 	}]
+
+def owncloudDockerServer():
+	return [{
+		'name': 'oc-docker-server',
+		'image': 'owncloud/server',
+		'pull': 'always',
+		'environment': {
+			'OWNCLOUD_DB_TYPE': getDbType('mysql'),
+			'OWNCLOUD_VERSION': '10.6',
+			'OWNCLOUD_DOMAIN': 'oc-docker-server',
+			'OWNCLOUD_DB_NAME': getDbDatabase('mariadb'),
+			'OWNCLOUD_DB_USERNAME': getDbUsername('mariadb'),
+			'OWNCLOUD_DB_PASSWORD': getDbPassword('mariadb'),
+			'OWNCLOUD_DB_HOST': getDbName('mariadb'),
+			'OWNCLOUD_ADMIN_USERNAME': 'admin',
+			'OWNCLOUD_ADMIN_PASSWORD': 'admin',
+			'HTTP_PORT': '8080',
+			'OWNCLOUD_MYSQL_UTF8MB4': 'true',
+			'OWNCLOUD_REDIS_ENABLED': 'true',
+			'OWNCLOUD_REDIS_HOST': 'redis-docker-server'
+		},
+		'depends_on': []
+	}]
+
+
+def redisServer():
+	return [{
+		'name': 'redis-docker-server',
+		'image': 'webhippie/redis:latest',
+		'pull': 'always',
+		'environment': {
+			'REDIS_DATABASES': 1
+		}
+	}]
+
+def runFilesExternalPhpUnitTests():
+	return [{
+		'name': 'files-external-unit-tests',
+		'image': 'owncloudci/php:7.4',
+		'pull': 'always',
+		'commands': [
+			'wait-for-it -t 1200 oc-docker-server:8080 -- echo "OC server is up."',
+			'sed -i "48 s/false/true/" apps/files_external/tests/config.php',
+			'sed -i "s/localhost\\\/owncloud/oc-server/g" apps/files_external/tests/config.php',
+			'cd /drone/src',
+			'make',
+			'curl -u admin:admin http://oc-docker-server:8080/ocs/v1.php/cloud/users -d userid="test" -d password="test"',
+			'TEST_PHP_SUITE=apps/files_external/tests/Storage/OwncloudTest.php make test-php-unit'
+		],
+		'depends_on': [],
+		'trigger': {
+			'ref': [
+				'refs/pull/**',
+				'refs/tags/**'
+			]
+		}
+	}]
+
+def filesExternalPhpUnitTests():
+	return [{
+		'kind': 'pipeline',
+		'type': 'docker',
+		'name': 'FilesExternalUnitTests',
+		'steps': runFilesExternalPhpUnitTests(),
+		'services': redisServer() +
+			databaseService('mariadb:10.5') +
+			owncloudDockerServer(),
+		'depends_on': [],
+		'trigger': {
+			'ref': [
+				'refs/pull/**',
+				'refs/tags/**'
+			]
+		}
+	}]
+
 
 def dependsOn(earlierStages, nextStages):
 	for earlierStage in earlierStages:
