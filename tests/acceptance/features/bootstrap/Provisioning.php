@@ -2440,6 +2440,21 @@ trait Provisioning {
 	}
 
 	/**
+	 * @Then the following groups should not exist
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theFollowingGroupsShouldNotExist(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["groupname"]);
+		$groups = $table->getHash();
+		foreach ($groups as $group) {
+			$this->groupShouldNotExist($group["groupname"]);
+		}
+	}
+
+	/**
 	 * @Then /^these groups should (not|)\s?exist:$/
 	 * expects a table of groups with the heading "groupname"
 	 *
@@ -2965,6 +2980,21 @@ trait Provisioning {
 	}
 
 	/**
+	 * @Then the the following user should belong to the following group
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theTheFollowingUserShouldBelongToTheFollowingGroup(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username", "groupname"]);
+		$rows = $table->getHash();
+		foreach ($rows as $row) {
+			$this->userShouldBelongToGroup($row["username"], $row["groupname"]);
+		}
+	}
+
+	/**
 	 * @param string $group
 	 *
 	 * @return array
@@ -2996,6 +3026,21 @@ trait Provisioning {
 		Assert::assertEquals(
 			200, $this->response->getStatusCode()
 		);
+	}
+
+	/**
+	 * @Then the the following user should not belong to the following group
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theTheFollowingUserShouldNotBelongToTheFollowingGroup(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username", "groupname"]);
+		$rows = $table->getHash();
+		foreach ($rows as $row) {
+			$this->userShouldNotBelongToGroup($row["username"], $row["groupname"]);
+		}
 	}
 
 	/**
@@ -3129,6 +3174,20 @@ trait Provisioning {
 	public function userHasBeenAddedToGroup($user, $group) {
 		$user = $this->getActualUsername($user);
 		$this->addUserToGroup($user, $group, null, true);
+	}
+
+	/**
+	 * @Given the following user have been added to the following group
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theFollowingUserHaveBeenAddedToTheFollowingGroup(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ['username', 'groupname']);
+		foreach ($table as $row) {
+			$this-> userHasBeenAddedToGroup($row['username'], $row['groupname']);
+		}
 	}
 
 	/**
@@ -3332,12 +3391,16 @@ trait Provisioning {
 	) {
 		$bodyTable = new TableNode([['groupid', $group]]);
 		$user = $user === null ? $this->getAdminUsername() : $user;
+		$this->emptyLastHTTPStatusCodesArray();
+		$this->emptyLastOCSStatusCodesArray();
 		$this->ocsContext->userSendsHTTPMethodToOcsApiEndpointWithBody(
 			$user,
 			"POST",
 			"/cloud/groups",
 			$bodyTable
 		);
+		$this->
+		pushToLastStatusCodesArrays();
 		$this->addGroupToCreatedGroupsList($group);
 	}
 
@@ -3599,6 +3662,21 @@ trait Provisioning {
 	}
 
 	/**
+	 * @When the administrator disables the following users using the provisioning API
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theAdministratorDisablesTheFollowingUsersUsingTheProvisioningApi(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username"]);
+		$usernames = $table->getHash();
+		foreach ($usernames as $username) {
+			$this->adminDisablesUserUsingTheProvisioningApi($username["username"]);
+		}
+	}
+
+	/**
 	 * @Given /^user "([^"]*)" has been disabled$/
 	 *
 	 * @param string $user
@@ -3610,6 +3688,21 @@ trait Provisioning {
 		$this->disableOrEnableUser($this->getAdminUsername(), $user, 'disable');
 		$this->theHTTPStatusCodeShouldBeSuccess();
 		$this->ocsContext->assertOCSResponseIndicatesSuccess();
+	}
+
+	/**
+	 * @Given the following users have been disabled
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theFollowingUsersHaveBeenDisabled(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username"]);
+		$usernames = $table->getHash();
+		foreach ($usernames as $username) {
+			$this->adminHasDisabledUserUsingTheProvisioningApi($username["username"]);
+		}
 	}
 
 	/**
@@ -3635,6 +3728,21 @@ trait Provisioning {
 	 */
 	public function theAdministratorEnablesUserUsingTheProvisioningApi($user) {
 		$this->disableOrEnableUser($this->getAdminUsername(), $user, 'enable');
+	}
+
+	/**
+	 * @When the administrator enables the following users using the provisioning API
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theAdministratorEnablesTheFollowingUsersUsingTheProvisioningApi(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username"]);
+		$usernames = $table->getHash();
+		foreach ($usernames as $username) {
+			$this->theAdministratorEnablesUserUsingTheProvisioningApi($username["username"]);
+		}
 	}
 
 	/**
@@ -3738,6 +3846,8 @@ trait Provisioning {
 	 * @throws \Exception
 	 */
 	public function deleteTheGroupUsingTheProvisioningApi($group) {
+		$this->emptyLastHTTPStatusCodesArray();
+		$this->emptyLastOCSStatusCodesArray();
 		$this->response = UserHelper::deleteGroup(
 			$this->getBaseUrl(),
 			$group,
@@ -3745,7 +3855,7 @@ trait Provisioning {
 			$this->getAdminPassword(),
 			$this->ocsApiVersion
 		);
-
+		$this->pushToLastStatusCodesArrays();
 		if ($this->theGroupShouldExist($group)
 			&& $this->theGroupShouldBeAbleToBeDeleted($group)
 			&& ($this->response->getStatusCode() !== 200)
@@ -3757,6 +3867,21 @@ trait Provisioning {
 		}
 
 		$this->rememberThatGroupIsNotExpectedToExist($group);
+	}
+
+	/**
+	 * @When the administrator deletes the following groups using the provisioning API
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theAdministratorDeletesTheFollowingGroupsUsingTheProvisioningApi(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["groupname"]);
+		$groups = $table->getHash();
+		foreach ($groups as $group) {
+			$this->deleteTheGroupUsingTheProvisioningApi($group["groupname"]);
+		}
 	}
 
 	/**
@@ -3830,6 +3955,20 @@ trait Provisioning {
 		$this->removeUserFromGroupAsAdminUsingTheProvisioningApi(
 			$user, $group
 		);
+	}
+
+	/**
+	 * @When the administrator removes the following user from the following group using the provisioning API
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theAdministratorRemovesTheFollowingUserFromTheFollowingGroupUsingTheProvisioningApi(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ['username', 'groupname']);
+		foreach ($table as $row) {
+			$this->adminRemovesUserFromGroupUsingTheProvisioningApi($row['username'], $row['groupname']);
+		}
 	}
 
 	/**
@@ -4602,13 +4741,28 @@ trait Provisioning {
 	}
 
 	/**
+	 * @Then the following users should be disabled
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theFollowingUsersShouldBeDisabled(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username"]);
+		$usernames = $table->getHash();
+		foreach ($usernames as $username) {
+			$this->userShouldBeDisabled($username["username"]);
+		}
+	}
+
+	/**
 	 * @Then /^user "([^"]*)" should be enabled$/
 	 *
 	 * @param string $user
 	 *
 	 * @return void
 	 */
-	public function useShouldBeEnabled($user) {
+	public function userShouldBeEnabled($user) {
 		$user = $this->getActualUsername($user);
 		$fullUrl = $this->getBaseUrl()
 			. "/ocs/v{$this->ocsApiVersion}.php/cloud/users/$user";
@@ -4618,6 +4772,21 @@ trait Provisioning {
 		Assert::assertEquals(
 			"true", $this->getResponseXml(null, __METHOD__)->data[0]->enabled
 		);
+	}
+
+	/**
+	 * @Then the following users should be enabled
+	 *
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theFollowingUsersShouldBeEnabled(TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["username"]);
+		$usernames = $table->getHash();
+		foreach ($usernames as $username) {
+			$this->userShouldBeEnabled($username["username"]);
+		}
 	}
 
 	/**
@@ -4927,6 +5096,7 @@ trait Provisioning {
 			$actualUser,
 			$actualPassword
 		);
+		$this->pushToLastStatusCodesArrays();
 	}
 
 	/**
