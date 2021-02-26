@@ -637,6 +637,7 @@ trait WebDav {
 	public function userMovesFileUsingTheAPI(
 		$user, $fileSource, $type, $fileDestination
 	) {
+		var_dump($type);
 		$user = $this->getActualUsername($user);
 		$headers['Destination'] = $this->destinationHeaderValue(
 			$user, $fileDestination
@@ -655,13 +656,31 @@ trait WebDav {
 			}
 		}
 		try {
+			$this->emptyLastHTTPStatusCodesArray();
 			$this->response = $this->makeDavRequest(
 				$user, "MOVE", $fileSource, $headers, null, "files", null, $stream
 			);
 			$this->setResponseXml(
 				HttpRequestHelper::parseResponseAsXml($this->response)
 			);
+			$this->pushToLastStatusCodesArrays();
 		} catch (ConnectException $e) {
+		}
+	}
+
+	/**
+	 * @When user :user moves the following file using the WebDAV API
+	 *
+	 * @param string $user
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function userMovesTheFollowingFileUsingTheWebdavApi($user, TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["source",  "destination"]);
+		$rows = $table->getHash();
+		foreach ($rows as $row) {
+			$this->userMovesFileUsingTheAPI($user, $row["source"], "", $row["destination"]);
 		}
 	}
 
@@ -1156,6 +1175,23 @@ trait WebDav {
 			$fileName, $user, "$content\n"
 		);
 	}
+
+	/**
+	 * @Then the content of the following files for user :user should be the following plus end-of-line
+	 *
+	 * @param string $user
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 */
+	public function theContentOfTheFollowingFilesForUserShouldBeTheFollowingPlusEndOfLine($user, TableNode $table) {
+		$this->verifyTableNodeColumns($table, ["filename",  "content"]);
+		$rows = $table->getHash();
+		foreach ($rows as $row) {
+			$this->contentOfFileForUserShouldBePlusEndOfLine($row["filename"], $user, $row["content"]);
+		}
+	}
+
 
 	/**
 	 * @Then /^the content of file "([^"]*)" for user "([^"]*)" on server "([^"]*)" should be "([^"]*)" plus end-of-line$/
